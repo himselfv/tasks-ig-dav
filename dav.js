@@ -1113,11 +1113,11 @@ var ICAL_OBJS = new Set(['VEVENT', 'VTODO', 'VJOURNAL', 'VFREEBUSY', 'VTIMEZONE'
  * @param {dav.Account} account to fetch calendars for.
  */
 
-var listCalendars = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee2(account, options) {
+var listCalendars = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee(account, options) {
   var req, responses, cals;
-  return regeneratorRuntime.wrap(function _callee2$(_context2) {
+  return regeneratorRuntime.wrap(function _callee$(_context) {
     while (1) {
-      switch (_context2.prev = _context2.next) {
+      switch (_context.prev = _context.next) {
         case 0:
           debug("Fetch calendars from home url ".concat(account.homeUrl));
           req = request.propfind({
@@ -1142,16 +1142,19 @@ var listCalendars = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(fu
             }, {
               name: 'sync-token',
               namespace: ns.DAV
+            }, {
+              name: 'supported-report-set',
+              namespace: ns.DAV
             }],
             depth: 1
           });
-          _context2.next = 4;
+          _context.next = 4;
           return options.xhr.send(req, account.homeUrl, {
             sandbox: options.sandbox
           });
 
         case 4:
-          responses = _context2.sent;
+          responses = _context.sent;
           debug("Found ".concat(responses.length, " calendars."));
           cals = responses.filter(function (res) {
             return res.props.resourcetype.includes('calendar');
@@ -1173,38 +1176,18 @@ var listCalendars = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(fu
               displayName: res.props.displayname,
               components: res.props.supportedCalendarComponentSet,
               resourcetype: res.props.resourcetype,
-              syncToken: res.props.syncToken
+              syncToken: res.props.syncToken,
+              reports: res.props.supportedReportSet
             });
           });
-          _context2.next = 9;
-          return cals.map(_co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee(cal) {
-            return regeneratorRuntime.wrap(function _callee$(_context) {
-              while (1) {
-                switch (_context.prev = _context.next) {
-                  case 0:
-                    _context.next = 2;
-                    return webdav.supportedReportSet(cal, options);
+          return _context.abrupt("return", cals);
 
-                  case 2:
-                    cal.reports = _context.sent;
-
-                  case 3:
-                  case "end":
-                    return _context.stop();
-                }
-              }
-            }, _callee);
-          })));
-
-        case 9:
-          return _context2.abrupt("return", cals);
-
-        case 10:
+        case 8:
         case "end":
-          return _context2.stop();
+          return _context.stop();
       }
     }
-  }, _callee2);
+  }, _callee);
 }));
 /**
  * @param {dav.Calendar} calendar the calendar to put the object on.
@@ -1268,11 +1251,11 @@ function deleteCalendarObject(calendarObject, options) {
  */
 
 
-var listCalendarObjects = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee3(calendar, options) {
+var listCalendarObjects = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee2(calendar, options) {
   var filters, req, responses;
-  return regeneratorRuntime.wrap(function _callee3$(_context3) {
+  return regeneratorRuntime.wrap(function _callee2$(_context2) {
     while (1) {
-      switch (_context3.prev = _context3.next) {
+      switch (_context2.prev = _context2.next) {
         case 0:
           debug("Doing REPORT on calendar ".concat(calendar.url, " which belongs to\n         ").concat(calendar.account.credentials.username));
           filters = options.filters || [{
@@ -1298,6 +1281,63 @@ var listCalendarObjects = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.m
             }],
             filters: filters
           });
+          _context2.next = 5;
+          return options.xhr.send(req, calendar.url, {
+            sandbox: options.sandbox
+          });
+
+        case 5:
+          responses = _context2.sent;
+          return _context2.abrupt("return", responses.map(function (res) {
+            debug("Found calendar object with url ".concat(res.href));
+            return new _model.CalendarObject({
+              data: res,
+              calendar: calendar,
+              url: _url["default"].resolve(calendar.account.rootUrl, res.href),
+              etag: res.props.getetag,
+              calendarData: res.props.calendarData
+            });
+          }));
+
+        case 7:
+        case "end":
+          return _context2.stop();
+      }
+    }
+  }, _callee2);
+}));
+/**
+ * @param {dav.Calendar} calendar the calendar to fetch objects for.
+ *
+ * Options:
+ *
+ *   (Array.<String>) paths - urls of items to retrieve.
+ *   (Array.<Object>) props - optional caldav properties.
+ *   (dav.Sandbox) sandbox - optional request sandbox.
+ *   (dav.Transport) xhr - request sender.
+ */
+
+
+exports.listCalendarObjects = listCalendarObjects;
+
+var getCalendarObjects = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee3(calendar, options) {
+  var props, req, responses;
+  return regeneratorRuntime.wrap(function _callee3$(_context3) {
+    while (1) {
+      switch (_context3.prev = _context3.next) {
+        case 0:
+          debug("Doing REPORT on calendar ".concat(calendar.url, " which belongs to\n         ").concat(calendar.account.credentials.username));
+          props = options.props || [{
+            name: 'getetag',
+            namespace: ns.DAV
+          }, {
+            name: 'calendar-data',
+            namespace: ns.CALDAV
+          }];
+          req = request.calendarMultiget({
+            props: props,
+            paths: options.paths
+          });
           _context3.next = 5;
           return options.xhr.send(req, calendar.url, {
             sandbox: options.sandbox
@@ -1322,63 +1362,6 @@ var listCalendarObjects = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.m
       }
     }
   }, _callee3);
-}));
-/**
- * @param {dav.Calendar} calendar the calendar to fetch objects for.
- *
- * Options:
- *
- *   (Array.<String>) paths - urls of items to retrieve.
- *   (Array.<Object>) props - optional caldav properties.
- *   (dav.Sandbox) sandbox - optional request sandbox.
- *   (dav.Transport) xhr - request sender.
- */
-
-
-exports.listCalendarObjects = listCalendarObjects;
-
-var getCalendarObjects = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee4(calendar, options) {
-  var props, req, responses;
-  return regeneratorRuntime.wrap(function _callee4$(_context4) {
-    while (1) {
-      switch (_context4.prev = _context4.next) {
-        case 0:
-          debug("Doing REPORT on calendar ".concat(calendar.url, " which belongs to\n         ").concat(calendar.account.credentials.username));
-          props = options.props || [{
-            name: 'getetag',
-            namespace: ns.DAV
-          }, {
-            name: 'calendar-data',
-            namespace: ns.CALDAV
-          }];
-          req = request.calendarMultiget({
-            props: props,
-            paths: options.paths
-          });
-          _context4.next = 5;
-          return options.xhr.send(req, calendar.url, {
-            sandbox: options.sandbox
-          });
-
-        case 5:
-          responses = _context4.sent;
-          return _context4.abrupt("return", responses.map(function (res) {
-            debug("Found calendar object with url ".concat(res.href));
-            return new _model.CalendarObject({
-              data: res,
-              calendar: calendar,
-              url: _url["default"].resolve(calendar.account.rootUrl, res.href),
-              etag: res.props.getetag,
-              calendarData: res.props.calendarData
-            });
-          }));
-
-        case 7:
-        case "end":
-          return _context4.stop();
-      }
-    }
-  }, _callee4);
 }));
 /**
  * @param {dav.Calendar} calendar the calendar to fetch updates to.
@@ -1414,22 +1397,22 @@ function syncCalendar(calendar, options) {
  */
 
 
-var syncCaldavAccount = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee6(account) {
+var syncCaldavAccount = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee5(account) {
   var options,
       cals,
-      _args6 = arguments;
-  return regeneratorRuntime.wrap(function _callee6$(_context6) {
+      _args5 = arguments;
+  return regeneratorRuntime.wrap(function _callee5$(_context5) {
     while (1) {
-      switch (_context6.prev = _context6.next) {
+      switch (_context5.prev = _context5.next) {
         case 0:
-          options = _args6.length > 1 && _args6[1] !== undefined ? _args6[1] : {};
+          options = _args5.length > 1 && _args5[1] !== undefined ? _args5[1] : {};
           options.loadObjects = false;
           if (!account.calendars) account.calendars = [];
-          _context6.next = 5;
+          _context5.next = 5;
           return listCalendars(account, options);
 
         case 5:
-          cals = _context6.sent;
+          cals = _context5.sent;
           cals.filter(function (cal) {
             // Filter the calendars not previously seen.
             return account.calendars.every(function (prev) {
@@ -1440,36 +1423,75 @@ var syncCaldavAccount = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mar
             account.calendars.push(cal);
           });
           options.loadObjects = true;
-          _context6.next = 10;
-          return account.calendars.map(_co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee5(cal, index) {
-            return regeneratorRuntime.wrap(function _callee5$(_context5) {
+          _context5.next = 10;
+          return account.calendars.map(_co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee4(cal, index) {
+            return regeneratorRuntime.wrap(function _callee4$(_context4) {
               while (1) {
-                switch (_context5.prev = _context5.next) {
+                switch (_context4.prev = _context4.next) {
                   case 0:
-                    _context5.prev = 0;
-                    _context5.next = 3;
+                    _context4.prev = 0;
+                    _context4.next = 3;
                     return syncCalendar(cal, options);
 
                   case 3:
-                    _context5.next = 9;
+                    _context4.next = 9;
                     break;
 
                   case 5:
-                    _context5.prev = 5;
-                    _context5.t0 = _context5["catch"](0);
-                    debug("Sync calendar ".concat(cal.displayName, " failed with ").concat(_context5.t0));
+                    _context4.prev = 5;
+                    _context4.t0 = _context4["catch"](0);
+                    debug("Sync calendar ".concat(cal.displayName, " failed with ").concat(_context4.t0));
                     account.calendars.splice(index, 1);
 
                   case 9:
                   case "end":
-                    return _context5.stop();
+                    return _context4.stop();
                 }
               }
-            }, _callee5, null, [[0, 5]]);
+            }, _callee4, null, [[0, 5]]);
           })));
 
         case 10:
-          return _context6.abrupt("return", account);
+          return _context5.abrupt("return", account);
+
+        case 11:
+        case "end":
+          return _context5.stop();
+      }
+    }
+  }, _callee5);
+}));
+
+exports.syncCaldavAccount = syncCaldavAccount;
+
+var basicSync = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee6(calendar, options) {
+  var sync;
+  return regeneratorRuntime.wrap(function _callee6$(_context6) {
+    while (1) {
+      switch (_context6.prev = _context6.next) {
+        case 0:
+          _context6.next = 2;
+          return webdav.isCollectionDirty(calendar, options);
+
+        case 2:
+          sync = _context6.sent;
+
+          if (sync) {
+            _context6.next = 6;
+            break;
+          }
+
+          debug('Local ctag matched remote! No need to sync :).');
+          return _context6.abrupt("return", calendar);
+
+        case 6:
+          debug('ctag changed so we need to fetch stuffs.');
+          _context6.next = 9;
+          return listCalendarObjects(calendar, options);
+
+        case 9:
+          calendar.objects = _context6.sent;
+          return _context6.abrupt("return", calendar);
 
         case 11:
         case "end":
@@ -1479,50 +1501,11 @@ var syncCaldavAccount = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mar
   }, _callee6);
 }));
 
-exports.syncCaldavAccount = syncCaldavAccount;
-
-var basicSync = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee7(calendar, options) {
-  var sync;
+var webdavSync = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee7(calendar, options) {
+  var req, result;
   return regeneratorRuntime.wrap(function _callee7$(_context7) {
     while (1) {
       switch (_context7.prev = _context7.next) {
-        case 0:
-          _context7.next = 2;
-          return webdav.isCollectionDirty(calendar, options);
-
-        case 2:
-          sync = _context7.sent;
-
-          if (sync) {
-            _context7.next = 6;
-            break;
-          }
-
-          debug('Local ctag matched remote! No need to sync :).');
-          return _context7.abrupt("return", calendar);
-
-        case 6:
-          debug('ctag changed so we need to fetch stuffs.');
-          _context7.next = 9;
-          return listCalendarObjects(calendar, options);
-
-        case 9:
-          calendar.objects = _context7.sent;
-          return _context7.abrupt("return", calendar);
-
-        case 11:
-        case "end":
-          return _context7.stop();
-      }
-    }
-  }, _callee7);
-}));
-
-var webdavSync = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(function _callee8(calendar, options) {
-  var req, result;
-  return regeneratorRuntime.wrap(function _callee8$(_context8) {
-    while (1) {
-      switch (_context8.prev = _context8.next) {
         case 0:
           req = request.syncCollection({
             props: [{
@@ -1535,13 +1518,13 @@ var webdavSync = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(funct
             syncLevel: 1,
             syncToken: calendar.syncToken
           });
-          _context8.next = 3;
+          _context7.next = 3;
           return options.xhr.send(req, calendar.url, {
             sandbox: options.sandbox
           });
 
         case 3:
-          result = _context8.sent;
+          result = _context7.sent;
           // TODO(gareth): Handle creations and deletions.
           result.responses.forEach(function (response) {
             // Find the calendar object that this response corresponds with.
@@ -1557,14 +1540,14 @@ var webdavSync = _co["default"].wrap( /*#__PURE__*/regeneratorRuntime.mark(funct
             calendarObject.calendarData = response.props.calendarData;
           });
           calendar.syncToken = result.syncToken;
-          return _context8.abrupt("return", calendar);
+          return _context7.abrupt("return", calendar);
 
         case 7:
         case "end":
-          return _context8.stop();
+          return _context7.stop();
       }
     }
-  }, _callee8);
+  }, _callee7);
 }));
 
 },{"./debug":6,"./fuzzy_url_equals":7,"./model":9,"./namespace":10,"./request":12,"./webdav":23,"co":25,"core-js/modules/web.dom.iterable":83,"url":90}],3:[function(require,module,exports){
